@@ -18,8 +18,8 @@ Replace a flat VPN with fine-grained, per-user access to private resources —
 [![SvelteKit](https://img.shields.io/badge/web--ui-SvelteKit-FF3E00.svg?logo=svelte&logoColor=white)](https://kit.svelte.dev/)
 [![Self-hosted](https://img.shields.io/badge/self--hosted-yes-success.svg)](docs/install.md)
 [![Ask DeepWiki](https://img.shields.io/badge/Ask-DeepWiki-20B2AA.svg)](https://deepwiki.com/wireztna/wireztna-oss)
-[![GitHub stars](https://img.shields.io/github/stars/wireztna/wireztna-oss?style=flat&logo=github)](https://github.com/wireztna/wireztna-oss/stargazers)
-[![Broker](https://img.shields.io/badge/broker-v1.0.5-blue.svg)](broker/README.md)
+[![GitHub stars](https://img.shields.io/github/stars/wireztna/wireztna-oss?style=flat&logo=github&cacheSeconds=3600)](https://github.com/wireztna/wireztna-oss/stargazers)
+[![Release](https://img.shields.io/github/v/release/wireztna/wireztna-oss?label=release&color=blue)](https://github.com/wireztna/wireztna-oss/releases/latest)
 [![Client](https://img.shields.io/badge/client-v0.9.31-blue.svg)](client/README.md)
 
 <br/>
