@@ -1,0 +1,18 @@
+{
+  "links": [
+    {
+      "identity": {"interface_name": "enp0s3", "backend": "systemd-resolved", "ifindex": 2},
+      "state": {
+        "servers": ["192.0.2.53"],
+        "domains": [{"name": "lan.example", "route_only": false}],
+        "default_route": true
+      },
+      "owner": "network-manager"
+    },
+    {
+      "identity": {"interface_name": "zt-corp0", "backend": "systemd-resolved", "ifindex": 42},
+      "state": {"servers": [], "domains": [], "default_route": false},
+      "owner": ""
+    }
+  ]
+}

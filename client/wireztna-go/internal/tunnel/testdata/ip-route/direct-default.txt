@@ -1,0 +1,2 @@
+default dev ppp0 proto static scope link metric 10
+203.0.113.0/24 dev ppp0 proto kernel scope link src 203.0.113.8

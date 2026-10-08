@@ -1,0 +1,5 @@
+0: from all lookup local
+1000: not from all fwmark 0xca6c/0xffff lookup 51820
+1000: from 10.200.0.0/16 to 10.50.0.0/16 iif wg-custom lookup main suppress_prefixlength 0
+32766: from all lookup main
+32767: from all lookup default

@@ -1,0 +1,13 @@
+{
+  "links": [
+    {
+      "identity": {
+        "interface_name": "wg-tenant42",
+        "backend": "network-manager",
+        "connection_uuid": "1846ebd5-f9bd-41dc-a784-20b7b390df65"
+      },
+      "state": {"servers": [], "domains": [], "default_route": false},
+      "owner": ""
+    }
+  ]
+}

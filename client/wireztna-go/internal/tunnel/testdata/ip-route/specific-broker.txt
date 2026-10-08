@@ -1,0 +1,2 @@
+default via 192.0.2.1 dev wlan0 proto dhcp metric 10
+203.0.113.0/24 dev eth1 proto kernel scope link src 203.0.113.20 metric 200

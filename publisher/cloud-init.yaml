@@ -1,0 +1,58 @@
+#cloud-config
+# WireZTNA Publisher — Cloud-init template
+# Replace <ENROLLMENT_TOKEN> and <CONTROL_PLANE_URL> before use
+
+package_update: true
+packages:
+  - wireguard-tools
+  - curl
+  - jq
+
+write_files:
+  - path: /opt/wireztna/enroll.sh
+    permissions: '0755'
+    content: |
+      # This will be fetched from the control plane in production
+      # For now, copy the enroll.sh script content here
+
+  - path: /etc/systemd/system/wireztna-publisher.service
+    content: |
+      [Unit]
+      Description=WireZTNA Publisher Agent
+      After=network-online.target
+      Wants=network-online.target
+
+      [Service]
+      Type=oneshot
+      RemainAfterExit=yes
+      Environment=ENROLLMENT_TOKEN=<ENROLLMENT_TOKEN>
+      Environment=CONTROL_PLANE_URL=<CONTROL_PLANE_URL>
+      ExecStart=/opt/wireztna/enroll.sh
+      ExecStop=/usr/bin/wg-quick down wg-broker
+
+      [Install]
+      WantedBy=multi-user.target
+
+  - path: /etc/systemd/system/wireztna-heartbeat.service
+    content: |
+      [Unit]
+      Description=WireZTNA Publisher Heartbeat
+      After=wireztna-publisher.service
+      Requires=wireztna-publisher.service
+
+      [Service]
+      Type=simple
+      Environment=CONTROL_PLANE_URL=<CONTROL_PLANE_URL>
+      ExecStart=/opt/wireztna/heartbeat.sh --loop
+      Restart=always
+      RestartSec=5
+
+      [Install]
+      WantedBy=multi-user.target
+
+runcmd:
+  - sysctl -w net.ipv4.ip_forward=1
+  - echo "net.ipv4.ip_forward=1" > /etc/sysctl.d/99-wireztna.conf
+  - systemctl daemon-reload
+  - systemctl enable --now wireztna-publisher
+  - systemctl enable --now wireztna-heartbeat

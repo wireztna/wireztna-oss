@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.wireztna.desktop-service</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/Library/Application Support/WireZTNA/bin/wireztna</string>
+    <string>desktop-service</string>
+    <string>--owner-uid</string>
+    <string>__OWNER_UID__</string>
+    <string>--config-dir</string>
+    <string>__CONFIG_DIR__</string>
+    <string>--socket-path</string>
+    <string>/var/run/wireztna/desktop-v2.sock</string>
+  </array>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>PATH</key>
+    <string>/Library/Application Support/WireZTNA/runtime:/usr/bin:/bin:/usr/sbin:/sbin</string>
+  </dict>
+  <key>WorkingDirectory</key>
+  <string>/Library/Application Support/WireZTNA</string>
+  <key>KeepAlive</key>
+  <dict>
+    <key>PathState</key>
+    <dict>
+      <key>__CONFIG_FILE__</key>
+      <true/>
+    </dict>
+  </dict>
+  <key>ProcessType</key>
+  <string>Background</string>
+  <key>UserName</key>
+  <string>root</string>
+  <key>GroupName</key>
+  <string>wheel</string>
+  <key>ThrottleInterval</key>
+  <integer>10</integer>
+  <key>Umask</key>
+  <integer>63</integer>
+</dict>
+</plist>

@@ -1,0 +1,19 @@
+[package]
+name = "wireztna-desktop"
+version = "0.1.0"
+description = "Non-privileged desktop app for the functional WireZTNA macOS pilot"
+authors = ["WireZTNA"]
+edition = "2024"
+rust-version = "1.98.1"
+publish = false
+
+[build-dependencies]
+tauri-build = { version = "=2.6.3", features = [] }
+
+[dependencies]
+serde = { version = "=1.0.229", features = ["derive"] }
+serde_json = "=1.0.151"
+tauri = { version = "=2.11.5", features = ["tray-icon"] }
+
+[target.'cfg(target_os = "macos")'.dependencies]
+socket2 = "=0.6.5"

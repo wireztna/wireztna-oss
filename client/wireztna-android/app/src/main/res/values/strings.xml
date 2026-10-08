@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">WireZTNA</string>
+    <string name="vpn_notification_channel">VPN Status</string>
+    <string name="vpn_notification_title">WireZTNA Connected</string>
+    <string name="vpn_notification_text">Tunnel active — %1$s</string>
+    <string name="vpn_notification_disconnected">Disconnected</string>
+    <string name="action_disconnect">Disconnect</string>
+</resources>

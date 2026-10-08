@@ -1,0 +1,318 @@
+#!/bin/bash -p
+# Runs only under macOS Installer, after payload placement.
+
+set -euo pipefail
+LC_ALL=C
+PATH=/usr/bin:/bin:/usr/sbin:/sbin
+export LC_ALL PATH
+
+SCRIPT_DIR=$(cd "$(/usr/bin/dirname "$0")" && /bin/pwd -P)
+LABEL=com.wireztna.desktop-service
+APP=/Applications/WireZTNA.app
+HELPER='/Library/Application Support/WireZTNA/bin/wireztna'
+SUPPORT='/Library/Application Support/WireZTNA'
+HELPER_DIR="$SUPPORT/bin"
+WG_DIR="$SUPPORT/wireguard"
+RUNTIME_DIR="$SUPPORT/runtime"
+WG_QUICK="$RUNTIME_DIR/wg-quick"
+WIREGUARD_GO="$RUNTIME_DIR/wireguard-go"
+WG="$RUNTIME_DIR/wg"
+BASH_RUNTIME="$RUNTIME_DIR/bash"
+RUNTIME_MANIFEST="$RUNTIME_DIR/provenance/runtime-manifest.json"
+PLIST=/Library/LaunchDaemons/com.wireztna.desktop-service.plist
+PLIST_TEMPLATE="$SCRIPT_DIR/com.wireztna.desktop-service.plist.in"
+PLIST_TEMP=/Library/LaunchDaemons/.com.wireztna.desktop-service.plist.new
+SOCKET=/var/run/wireztna/desktop-v2.sock
+EXPECTED_PATH="$RUNTIME_DIR:/usr/bin:/bin:/usr/sbin:/sbin"
+TXN_DIR=/private/var/db/wireztna-desktop-installer-rollback
+PREVIOUS_APP="$TXN_DIR/WireZTNA.previous.app"
+PREVIOUS_HELPER="$TXN_DIR/wireztna.previous"
+PREVIOUS_RUNTIME="$TXN_DIR/runtime.previous"
+PREVIOUS_PLIST="$TXN_DIR/com.wireztna.desktop-service.previous.plist"
+WAS_ACTIVE="$TXN_DIR/was-active"
+UPGRADE_ROLLBACK=false
+PREVIOUS_DAEMON_WAS_ACTIVE=false
+NEW_DAEMON_ROLLBACK=false
+PLIST_CREATED=false
+HAS_CONFIG=false
+OWNER_UID=
+CONFIG_DIR=
+CONFIG_FILE=
+
+fail() { printf 'WireZTNA postinstall: %s\n' "$*" >&2; exit 1; }
+sha256() { /usr/bin/shasum -a 256 "$1" | /usr/bin/awk '{print $1}'; }
+
+root_owned_tree_safe() {
+    local path=$1 unsafe
+    [ -d "$path" ] && [ ! -L "$path" ] || return 1
+    unsafe=$(/usr/bin/find "$path" \( -type l -o ! -user root -o ! -group wheel -o -perm -020 -o -perm -002 \) -print -quit) || return 1
+    [ -z "$unsafe" ]
+}
+
+# launchctl_print_state returns 0 only when present, 1 only for the exact
+# macOS service-not-found contract, and 2 for every ambiguous observation.
+launchctl_print_state() {
+    local launchctl_bin=$1 label=$2 stderr rc expected
+    if stderr=$("$launchctl_bin" print "system/$label" 2>&1 >/dev/null); then return 0; else rc=$?; fi
+    expected=$(printf 'Bad request.\nCould not find service "%s" in domain for system' "$label")
+    if [ "$rc" -eq 113 ] && [ "$stderr" = "$expected" ]; then return 1; fi
+    printf 'WireZTNA postinstall: ambiguous launchctl print result: status=%s stderr=%q\n' "$rc" "$stderr" >&2
+    return 2
+}
+# End launchctl_print_state.
+
+validate_upgrade_transaction() {
+    [ -e "$TXN_DIR" ] || return 0
+    [ -d "$TXN_DIR" ] && [ ! -L "$TXN_DIR" ] && [ "$(/usr/bin/stat -f '%u:%g:%Lp' "$TXN_DIR")" = 0:0:700 ] || fail 'installer rollback path is unsafe'
+    root_owned_tree_safe "$PREVIOUS_APP" || fail 'previous app rollback evidence is unsafe'
+    root_owned_tree_safe "$PREVIOUS_RUNTIME" || fail 'previous runtime rollback evidence is unsafe'
+    [ -f "$PREVIOUS_HELPER" ] && [ ! -L "$PREVIOUS_HELPER" ] && [ "$(/usr/bin/stat -f '%u:%g:%Lp' "$PREVIOUS_HELPER")" = 0:0:755 ] || fail 'previous helper rollback evidence is unsafe'
+    [ -f "$PREVIOUS_PLIST" ] && [ ! -L "$PREVIOUS_PLIST" ] && [ "$(/usr/bin/stat -f '%u:%g:%Lp' "$PREVIOUS_PLIST")" = 0:0:644 ] || fail 'previous plist rollback evidence is unsafe'
+    [ -f "$WAS_ACTIVE" ] && [ ! -L "$WAS_ACTIVE" ] && [ "$(/usr/bin/stat -f '%u:%g:%Lp' "$WAS_ACTIVE")" = 0:0:600 ] || fail 'previous daemon-state rollback evidence is unsafe'
+    case "$(/bin/cat "$WAS_ACTIVE")" in 1) PREVIOUS_DAEMON_WAS_ACTIVE=true ;; 0) PREVIOUS_DAEMON_WAS_ACTIVE=false ;; *) fail 'previous daemon-state rollback evidence is invalid' ;; esac
+    /usr/bin/plutil -lint "$PREVIOUS_PLIST" >/dev/null || fail 'previous plist rollback evidence is invalid'
+    [ "$(/usr/bin/plutil -extract Label raw -o - "$PREVIOUS_PLIST")" = "$LABEL" ] || fail 'previous plist rollback label mismatch'
+    [ "$(/usr/bin/plutil -extract ProgramArguments.0 raw -o - "$PREVIOUS_PLIST")" = "$HELPER" ] || fail 'previous plist rollback helper mismatch'
+    UPGRADE_ROLLBACK=true
+}
+
+wait_for_daemon_absence() {
+    local remaining=30 rc
+    while :; do
+        if launchctl_print_state /bin/launchctl "$LABEL"; then
+            [ "$remaining" -gt 0 ] || return 1
+            /bin/sleep 1 || return 1
+            remaining=$((remaining - 1))
+        else
+            rc=$?; [ "$rc" -eq 1 ] || return 1; return 0
+        fi
+    done
+}
+
+cleanup_failure() {
+    local status=$1 absent=false restored=true verify_helper="$HELPER" verify_owner="$OWNER_UID" verify_config="$CONFIG_DIR" rc remaining
+    trap - EXIT HUP INT TERM
+    /bin/rm -f "$PLIST_TEMP" 2>/dev/null || :
+    if [ "$status" -ne 0 ] && { [ "$NEW_DAEMON_ROLLBACK" = true ] || [ "$UPGRADE_ROLLBACK" = true ] || [ "$PLIST_CREATED" = true ]; }; then
+        if launchctl_print_state /bin/launchctl "$LABEL"; then
+            /bin/launchctl bootout "system/$LABEL" || restored=false
+        else
+            rc=$?; [ "$rc" -eq 1 ] || restored=false
+        fi
+        if [ "$restored" = true ] && wait_for_daemon_absence; then absent=true; else
+            printf '%s\n' 'WireZTNA postinstall: rollback incomplete; daemon absence was ambiguous or timed out and evidence was preserved' >&2
+            restored=false
+        fi
+        if [ "$UPGRADE_ROLLBACK" = true ]; then
+            verify_helper="$PREVIOUS_HELPER"
+            verify_owner=$(/usr/bin/plutil -extract ProgramArguments.3 raw -o - "$PREVIOUS_PLIST" 2>/dev/null || :)
+            verify_config=$(/usr/bin/plutil -extract ProgramArguments.5 raw -o - "$PREVIOUS_PLIST" 2>/dev/null || :)
+        fi
+        if [ "$absent" = true ] && { [ "$UPGRADE_ROLLBACK" = true ] || [ "$HAS_CONFIG" = true ]; }; then
+            "$verify_helper" desktop-verify-disconnected --owner-uid "$verify_owner" --config-dir "$verify_config" || { printf '%s\n' 'WireZTNA postinstall: rollback incomplete; owned network state remains and evidence was preserved' >&2; restored=false; }
+        elif [ "$absent" = true ] && { [ -e "$SOCKET" ] || [ -L "$SOCKET" ]; }; then
+            printf '%s\n' 'WireZTNA postinstall: rollback incomplete; unexpected IPC state remains' >&2
+            restored=false
+        fi
+
+        if [ "$restored" = true ] && [ "$UPGRADE_ROLLBACK" = true ]; then
+            [ ! -L "$APP" ] && [ ! -L "$HELPER" ] && [ ! -L "$RUNTIME_DIR" ] && [ ! -L "$PLIST" ] || restored=false
+            if [ -e "$APP" ]; then root_owned_tree_safe "$APP" && /bin/rm -rf "$APP" || restored=false; fi
+            if [ -e "$RUNTIME_DIR" ]; then root_owned_tree_safe "$RUNTIME_DIR" && /bin/rm -rf "$RUNTIME_DIR" || restored=false; fi
+            if [ "$restored" = true ]; then
+                /usr/bin/ditto --norsrc --noextattr --noqtn "$PREVIOUS_APP" "$APP" \
+                    && /bin/cp -p "$PREVIOUS_HELPER" "$HELPER" \
+                    && /usr/bin/ditto --norsrc --noextattr --noqtn "$PREVIOUS_RUNTIME" "$RUNTIME_DIR" \
+                    && /bin/cp -p "$PREVIOUS_PLIST" "$PLIST" \
+                    && /usr/sbin/chown -R 0:0 "$APP" "$RUNTIME_DIR" \
+                    && /usr/sbin/chown 0:0 "$HELPER" "$PLIST" \
+                    && /bin/chmod -R go-w "$APP" "$RUNTIME_DIR" \
+                    && /bin/chmod 0755 "$HELPER" \
+                    && /bin/chmod 0644 "$PLIST" \
+                    && root_owned_tree_safe "$APP" \
+                    && root_owned_tree_safe "$RUNTIME_DIR" \
+                    || { printf '%s\n' 'WireZTNA postinstall: failed to restore previous app/helper/runtime/plist; rollback evidence was preserved' >&2; restored=false; }
+            fi
+            if [ "$restored" = true ] && [ "$PREVIOUS_DAEMON_WAS_ACTIVE" = true ]; then
+                /bin/launchctl bootstrap system "$PLIST" && /bin/launchctl kickstart "system/$LABEL" || { printf '%s\n' 'WireZTNA postinstall: failed to restart previous daemon; rollback evidence was preserved' >&2; restored=false; }
+                remaining=30
+                while [ "$restored" = true ]; do
+                    if launchctl_print_state /bin/launchctl "$LABEL"; then break; else rc=$?; fi
+                    if [ "$rc" -ne 1 ] || [ "$remaining" -le 0 ]; then restored=false; break; fi
+                    /bin/sleep 1 || { restored=false; break; }
+                    remaining=$((remaining - 1))
+                done
+                [ "$restored" = true ] || printf '%s\n' 'WireZTNA postinstall: could not prove previous daemon restoration; rollback evidence was preserved' >&2
+            fi
+            if [ "$restored" = true ]; then /bin/rm -rf "$TXN_DIR" || printf '%s\n' 'WireZTNA postinstall: previous installation restored but rollback evidence could not be removed' >&2; fi
+        elif [ "$restored" = true ] && [ "$PLIST_CREATED" = true ]; then
+            /bin/rm -f "$PLIST" || restored=false
+        fi
+    fi
+    exit "$status"
+}
+handle_exit() { local status=$?; cleanup_failure "$status"; }
+handle_signal() { cleanup_failure "$1"; }
+trap handle_exit EXIT
+trap 'handle_signal 129' HUP
+trap 'handle_signal 130' INT
+trap 'handle_signal 143' TERM
+
+validate_owner_private() {
+    local path=$1 kind=$2 mode
+    [ ! -L "$path" ] || fail "symlink rejected at $path"
+    if [ "$kind" = directory ]; then [ -d "$path" ]; else [ -f "$path" ]; fi || fail "invalid $kind at $path"
+    [ "$(/usr/bin/stat -f '%u' "$path")" = "$OWNER_UID" ] || fail "owner mismatch at $path"
+    mode=$(/usr/bin/stat -f '%Lp' "$path")
+    [ $((8#$mode & 8#77)) -eq 0 ] || fail "group/other access rejected at $path"
+}
+
+resolve_fresh_owner() {
+    local console_name account_name home_record
+    OWNER_UID=$(/usr/bin/stat -f '%u' /dev/console) || fail 'could not resolve console owner UID'
+    console_name=$(/usr/bin/stat -f '%Su' /dev/console) || fail 'could not resolve console owner name'
+    case "$OWNER_UID" in ''|0|*[!0-9]*) fail 'an active non-root console user is required for fresh install' ;; esac
+    printf '%s\n' "$console_name" | /usr/bin/grep -Eq '^[A-Za-z0-9._-]+$' || fail 'console account name is unsafe'
+    account_name=$(/usr/bin/id -nu "$OWNER_UID" 2>/dev/null) || fail 'console UID does not resolve to a local account'
+    [ "$account_name" = "$console_name" ] || fail 'console UID/name mapping is inconsistent'
+    home_record=$(/usr/bin/dscl . -read "/Users/$account_name" NFSHomeDirectory 2>/dev/null) || fail 'console account home is unavailable'
+    HOME_DIR=${home_record#NFSHomeDirectory: }
+    [ "$HOME_DIR" != "$home_record" ] || fail 'console account home record is malformed'
+    printf '%s\n' "$HOME_DIR" | /usr/bin/grep -Eq '^/Users/[[:alnum:] ._@+-]+$' || fail 'console account home path is unsafe'
+    [ -d "$HOME_DIR" ] && [ ! -L "$HOME_DIR" ] && [ "$(cd "$HOME_DIR" && /bin/pwd -P)" = "$HOME_DIR" ] || fail 'console account home must be a canonical real directory'
+    [ "$(/usr/bin/stat -f '%u' "$HOME_DIR")" = "$OWNER_UID" ] || fail 'console account home owner mismatch'
+    CONFIG_DIR="$HOME_DIR/.wireztna"
+    if [ ! -e "$CONFIG_DIR" ] && [ ! -L "$CONFIG_DIR" ]; then
+        /bin/mkdir -m 0700 "$CONFIG_DIR" || fail 'could not create owner configuration directory'
+        /usr/sbin/chown "$OWNER_UID":staff "$CONFIG_DIR" || fail 'could not assign owner configuration directory'
+    fi
+}
+
+materialize_plist() {
+    local keepalive_json
+    [ -f "$PLIST_TEMPLATE" ] && [ ! -L "$PLIST_TEMPLATE" ] || fail 'packaged plist template is absent or unsafe'
+    /usr/bin/plutil -lint "$PLIST_TEMPLATE" >/dev/null || fail 'packaged plist template is invalid'
+    [ ! -e "$PLIST_TEMP" ] && [ ! -L "$PLIST_TEMP" ] || fail 'temporary plist path already exists'
+    /bin/cp -X "$PLIST_TEMPLATE" "$PLIST_TEMP" || fail 'could not stage plist template'
+    /bin/chmod 0600 "$PLIST_TEMP"
+    /usr/bin/plutil -replace ProgramArguments.3 -string "$OWNER_UID" "$PLIST_TEMP" || fail 'could not materialize owner UID'
+    /usr/bin/plutil -replace ProgramArguments.5 -string "$CONFIG_DIR" "$PLIST_TEMP" || fail 'could not materialize config directory'
+    keepalive_json="{\"PathState\":{\"$CONFIG_FILE\":true}}"
+    /usr/bin/plutil -replace KeepAlive -json "$keepalive_json" "$PLIST_TEMP" || fail 'could not materialize PathState policy'
+    /usr/bin/plutil -lint "$PLIST_TEMP" >/dev/null || fail 'materialized plist is invalid'
+    /usr/bin/plutil -convert json -o - "$PLIST_TEMP" | /usr/bin/grep -Fq "\"$CONFIG_FILE\":true" || fail 'materialized PathState does not target owner config'
+    ! /usr/bin/grep -Eq '__OWNER_UID__|__CONFIG_DIR__|__CONFIG_FILE__' "$PLIST_TEMP" || fail 'materialized plist retains a placeholder'
+    /usr/sbin/chown 0:0 "$PLIST_TEMP" && /bin/chmod 0644 "$PLIST_TEMP" || fail 'could not secure materialized plist'
+    /bin/mv -f "$PLIST_TEMP" "$PLIST" || fail 'could not install materialized plist atomically'
+    PLIST_CREATED=true
+}
+
+validate_root_file() {
+    local path=$1 mode
+    [ -f "$path" ] && [ ! -L "$path" ] || fail "runtime file is absent or unsafe: $path"
+    [ "$(/usr/bin/stat -f '%u:%g' "$path")" = 0:0 ] || fail "runtime file must be root:wheel: $path"
+    mode=$(/usr/bin/stat -f '%Lp' "$path"); [ $((8#$mode & 8#22)) -eq 0 ] || fail "runtime file is writable by group/other: $path"
+}
+validate_arm64_macho() {
+    local path=$1 dependencies dependency minos signature
+    /usr/bin/lipo -archs "$path" | /usr/bin/grep -Ex arm64 >/dev/null || fail "runtime Mach-O must be arm64-only: $path"
+    minos=$(/usr/bin/otool -l "$path" | /usr/bin/awk '/LC_BUILD_VERSION/{seen=1;next} seen && /minos/{print $2; exit} /LC_VERSION_MIN_MACOSX/{legacy=1;next} legacy && /version/{print $2; exit}')
+    case "$minos" in 10.*|11.*|12.0) ;; *) fail "runtime minimum macOS exceeds 12.0 or is unreadable: $path ($minos)" ;; esac
+    dependencies=$(/usr/bin/otool -L "$path" | /usr/bin/sed -n '2,$ { s/^[[:space:]]*//; s/[[:space:]](compatibility.*$//; p; }') || fail "could not inspect runtime dependencies: $path"
+    while IFS= read -r dependency; do [ -z "$dependency" ] || case "$dependency" in /System/Library/*|/usr/lib/*) ;; *) fail "unsafe runtime dependency: $path -> $dependency" ;; esac; done <<EOF
+$dependencies
+EOF
+    /usr/bin/codesign --verify --strict "$path" || fail "runtime ad-hoc signature is invalid: $path"
+    signature=$(/usr/bin/codesign -dv --verbose=4 "$path" 2>&1); case "$signature" in *'Signature=adhoc'*) ;; *) fail "runtime Mach-O must be ad-hoc signed: $path" ;; esac
+}
+
+[ "$#" -ge 3 ] || fail 'installer script arguments are required'
+[ "$(/usr/bin/id -u)" -eq 0 ] || fail 'must run in the root Installer context'
+[ "$2" = / ] && [ "$3" = / ] || fail 'only the startup volume root is supported'
+case "$1" in *.pkg) ;; *) fail 'package context is invalid' ;; esac
+[ "$(/usr/bin/uname -s)" = Darwin ] && [ "$(/usr/bin/uname -m)" = arm64 ] || fail 'darwin/arm64 is required'
+validate_upgrade_transaction
+
+for path in "$APP" "$HELPER" "$SUPPORT" "$HELPER_DIR" "$WG_DIR" "$RUNTIME_DIR"; do [ ! -L "$path" ] || fail "symlink rejected at $path"; done
+[ -d "$APP" ] && [ -f "$HELPER" ] && [ -d "$SUPPORT" ] && [ -d "$HELPER_DIR" ] && [ -d "$WG_DIR" ] && [ -d "$RUNTIME_DIR" ] || fail 'required installed payload paths are absent'
+root_owned_tree_safe "$APP" || fail 'app tree has unsafe ownership, permissions, or symlinks'
+root_owned_tree_safe "$RUNTIME_DIR" || fail 'runtime tree has unsafe ownership, permissions, or symlinks'
+[ "$(/usr/bin/stat -f '%u:%g:%Lp' "$SUPPORT")" = 0:0:755 ] || fail 'support directory metadata mismatch'
+[ "$(/usr/bin/stat -f '%u:%g:%Lp' "$HELPER_DIR")" = 0:0:755 ] || fail 'helper parent directory metadata mismatch'
+[ "$(/usr/bin/stat -f '%u:%g:%Lp' "$HELPER")" = 0:0:755 ] || fail 'helper metadata mismatch'
+[ "$(/usr/bin/stat -f '%u:%g:%Lp' "$WG_DIR")" = 0:0:700 ] || fail 'WireGuard directory must be root:wheel 0700'
+
+if [ "$UPGRADE_ROLLBACK" = true ]; then
+    OWNER_UID=$(/usr/bin/plutil -extract ProgramArguments.3 raw -o - "$PREVIOUS_PLIST")
+    CONFIG_DIR=$(/usr/bin/plutil -extract ProgramArguments.5 raw -o - "$PREVIOUS_PLIST")
+else
+    resolve_fresh_owner
+fi
+case "$OWNER_UID" in ''|0|*[!0-9]*) fail 'owner UID is invalid' ;; esac
+/usr/bin/id -nu "$OWNER_UID" >/dev/null 2>&1 || fail 'owner UID does not resolve to a local account'
+printf '%s\n' "$CONFIG_DIR" | /usr/bin/grep -Eq '^/[[:alnum:] ._/@+-]+$' || fail 'config directory path is unsafe'
+[ "$(cd "$CONFIG_DIR" 2>/dev/null && /bin/pwd -P)" = "$CONFIG_DIR" ] || fail 'config directory is absent, unclean, or indirect'
+validate_owner_private "$CONFIG_DIR" directory
+CONFIG_FILE="$CONFIG_DIR/config.yaml"
+if [ -e "$CONFIG_FILE" ] || [ -L "$CONFIG_FILE" ]; then
+    validate_owner_private "$CONFIG_FILE" file
+    [ -s "$CONFIG_FILE" ] || fail 'config.yaml is empty'
+    if [ -e "$CONFIG_DIR/token" ] || [ -L "$CONFIG_DIR/token" ]; then validate_owner_private "$CONFIG_DIR/token" file; fi
+    "$HELPER" desktop-validate-config --owner-uid "$OWNER_UID" --config-dir "$CONFIG_DIR" || fail 'owner configuration failed helper validation'
+    HAS_CONFIG=true
+elif [ "$UPGRADE_ROLLBACK" = true ]; then
+    fail 'upgrade requires the existing owner config.yaml'
+fi
+
+[ -f "$RUNTIME_MANIFEST" ] && [ ! -L "$RUNTIME_MANIFEST" ] && [ "$(/usr/bin/plutil -extract schema_version raw -o - "$RUNTIME_MANIFEST" 2>/dev/null)" = 1 ] || fail 'runtime manifest is absent or invalid'
+[ "$(/usr/bin/plutil -extract architecture raw -o - "$RUNTIME_MANIFEST")" = arm64 ] && [ "$(/usr/bin/plutil -extract minimum_macos raw -o - "$RUNTIME_MANIFEST")" = 12.0 ] || fail 'runtime manifest platform mismatch'
+for component in bash wg wg-quick wireguard-go; do
+    validate_root_file "$RUNTIME_DIR/$component"
+    [ -x "$RUNTIME_DIR/$component" ] || fail "runtime component is not executable: $component"
+    expected=$(/usr/bin/plutil -extract "components.$component.sha256" raw -o - "$RUNTIME_MANIFEST")
+    [ "$(sha256 "$RUNTIME_DIR/$component")" = "$expected" ] || fail "runtime manifest checksum mismatch: $component"
+done
+[ "$(/usr/bin/head -n 1 "$WG_QUICK")" = '#!/usr/bin/env bash' ] || fail 'wg-quick must use the reviewed env bash shebang'
+/usr/bin/grep -q wireguard-go "$WG_QUICK" || fail 'wg-quick does not declare the wireguard-go userspace chain'
+validate_arm64_macho "$WIREGUARD_GO"
+validate_arm64_macho "$WG"
+validate_arm64_macho "$BASH_RUNTIME"
+BASH_MAJOR=$(/usr/bin/env -i PATH="$EXPECTED_PATH" "$BASH_RUNTIME" --noprofile --norc -c 'printf "%s\n" "${BASH_VERSINFO[0]}"') || fail 'root-owned Bash runtime could not start'
+case "$BASH_MAJOR" in ''|*[!0-9]*) fail 'root-owned Bash runtime returned an invalid version' ;; esac
+[ "$BASH_MAJOR" -ge 4 ] || fail 'root-owned Bash runtime must be version 4 or newer'
+
+/usr/bin/lipo -archs "$HELPER" | /usr/bin/grep -Ex arm64 >/dev/null || fail 'helper must be arm64-only'
+APP_EXECUTABLE=$(/usr/bin/plutil -extract CFBundleExecutable raw -o - "$APP/Contents/Info.plist")
+[ "$(/usr/bin/plutil -extract CFBundleIdentifier raw -o - "$APP/Contents/Info.plist")" = com.wireztna.desktop ] || fail 'app bundle identifier mismatch'
+/usr/bin/lipo -archs "$APP/Contents/MacOS/$APP_EXECUTABLE" | /usr/bin/grep -Ex arm64 >/dev/null || fail 'app must be arm64-only'
+/usr/bin/codesign --verify --strict "$HELPER" || fail 'helper ad-hoc signature is invalid'
+/usr/bin/codesign --verify --deep --strict "$APP" || fail 'app ad-hoc signature is invalid'
+HELPER_SIGNATURE=$(/usr/bin/codesign -dv --verbose=4 "$HELPER" 2>&1); APP_SIGNATURE=$(/usr/bin/codesign -dv --verbose=4 "$APP" 2>&1)
+case "$HELPER_SIGNATURE" in *'Signature=adhoc'*) ;; *) fail 'helper must be ad-hoc signed' ;; esac
+case "$APP_SIGNATURE" in *'Signature=adhoc'*) ;; *) fail 'app must be ad-hoc signed' ;; esac
+[ ! -e /var/run/wireztna.sock ] && [ ! -L /var/run/wireztna.sock ] || fail 'legacy IPC path exists; refusing mixed IPC generations'
+[ "$HAS_CONFIG" = true ] || { [ ! -e "$SOCKET" ] && [ ! -L "$SOCKET" ]; } || fail 'unexpected authenticated IPC state exists before fresh enrollment'
+
+materialize_plist
+[ "$(/usr/bin/plutil -extract ProgramArguments raw -o - "$PLIST")" = 8 ] || fail 'plist must contain exactly eight service arguments'
+[ "$(/usr/bin/plutil -extract ProgramArguments.3 raw -o - "$PLIST")" = "$OWNER_UID" ] && [ "$(/usr/bin/plutil -extract ProgramArguments.5 raw -o - "$PLIST")" = "$CONFIG_DIR" ] || fail 'plist owner/config mismatch'
+[ "$(/usr/bin/plutil -extract EnvironmentVariables.PATH raw -o - "$PLIST")" = "$EXPECTED_PATH" ] || fail 'runtime PATH mismatch'
+[ "$(/usr/bin/plutil -extract ProcessType raw -o - "$PLIST")" = Background ] && [ "$(/usr/bin/plutil -extract UserName raw -o - "$PLIST")" = root ] && [ "$(/usr/bin/plutil -extract GroupName raw -o - "$PLIST")" = wheel ] || fail 'plist service identity mismatch'
+
+NEW_DAEMON_ROLLBACK=true
+/bin/launchctl bootstrap system "$PLIST" || fail 'could not bootstrap daemon'
+if [ "$HAS_CONFIG" = true ]; then
+    /bin/launchctl kickstart "system/$LABEL" || fail 'could not start enrolled daemon'
+    count=0
+    while [ ! -S "$SOCKET" ] && [ "$count" -lt 50 ]; do /bin/sleep 0.1; count=$((count + 1)); done
+    [ -S "$SOCKET" ] && [ ! -L "$SOCKET" ] || fail 'authenticated IPC v2 socket did not appear'
+    [ "$(/usr/bin/stat -f '%u:%Lp' "$SOCKET")" = "$OWNER_UID:600" ] || fail 'IPC v2 socket ownership/mode mismatch'
+fi
+/bin/launchctl print "system/$LABEL" >/dev/null || fail 'daemon is not loaded'
+
+NEW_DAEMON_ROLLBACK=false
+UPGRADE_ROLLBACK=false
+PLIST_CREATED=false
+trap - EXIT HUP INT TERM
+if [ -e "$TXN_DIR" ]; then /bin/rm -rf "$TXN_DIR" || printf '%s\n' 'WireZTNA postinstall: installation committed; stale rollback evidence must be removed manually' >&2; fi
+exit 0

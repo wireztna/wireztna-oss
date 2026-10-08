@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=WireZTNA
+Comment=Zero Trust Network Access Client
+Exec=/usr/bin/wireztna-desktop
+TryExec=/usr/bin/wireztna-desktop
+Icon=wireztna
+Categories=Network;Security;
+StartupNotify=false
+Terminal=false

@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Shield icon (matches web UI logo) - white shield on transparent background -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Shield shape centered in the adaptive icon safe zone (24dp padding each side) -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M54,28 L54,28 C54,28 36,34 36,34 L36,52 C36,64 43.5,75 54,78 C64.5,75 72,64 72,52 L72,34 C72,34 54,28 54,28 Z"
+        android:strokeWidth="0"/>
+    <!-- Lock/checkmark inside shield -->
+    <path
+        android:fillColor="#4F46E5"
+        android:pathData="M50,58 L48,56 L46.5,57.5 L50,61 L61,50 L59.5,48.5 L50,58 Z"
+        android:strokeWidth="0"/>
+</vector>

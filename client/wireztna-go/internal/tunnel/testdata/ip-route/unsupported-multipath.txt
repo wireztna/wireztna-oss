@@ -1,0 +1,1 @@
+default proto static metric 100 nexthop via 192.0.2.1 dev enp0s3 weight 1 nexthop via 198.51.100.1 dev wlan0 weight 1

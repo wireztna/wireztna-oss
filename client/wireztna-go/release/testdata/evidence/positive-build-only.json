@@ -1,0 +1,37 @@
+{
+  "identity": {
+    "contract": "wireztna-platform-evidence",
+    "schema_version": 1,
+    "evidence_id": "fixture.build-only",
+    "generated_at": "2026-01-02T03:04:05Z"
+  },
+  "source": {
+    "producer": "contract-test",
+    "producer_git_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "test_fixture": true
+  },
+  "tuple": {
+    "version": "1.2.3",
+    "git_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "os": "windows",
+    "arch": "amd64",
+    "type": "msi",
+    "artifact": {
+      "filename": "wireztna_contract_fixture_1.2.3_amd64.msi",
+      "size": 1024,
+      "sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+    }
+  },
+  "claim": {
+    "level": "build-only",
+    "artifact": true,
+    "runtime": false,
+    "public_eligibility": false
+  },
+  "gates": [
+    {"id": "contract.e0", "status": "passed"}
+  ],
+  "signature": {"status": "not-asserted"},
+  "provenance": {"status": "not-asserted"},
+  "limitations": ["contract fixture only; runtime and platform support are not asserted"]
+}

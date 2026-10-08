@@ -1,0 +1,37 @@
+{
+  "schema_version": 1,
+  "architecture": "arm64",
+  "minimum_macos": "12.0",
+  "toolchain": {
+    "macos_sdk": "15.4",
+    "go": "1.23.2"
+  },
+  "components": {
+    "bash": {
+      "version": "5.3.0",
+      "source_url": "https://ftp.gnu.org/gnu/bash/bash-5.3.tar.gz",
+      "source_sha256": "0d5cd86965f869a26cf64f4b71be7b96f90a3ba8b3d74e27e8e9d9d5550f31ba",
+      "license": "GPL-3.0-or-later",
+      "patch_level": 0,
+      "configure_flags": [
+        "--without-installed-readline",
+        "--disable-nls",
+        "--without-bash-malloc",
+        "--disable-rpath"
+      ]
+    },
+    "wireguard_tools": {
+      "version": "1.0.20260223",
+      "repository": "https://github.com/WireGuard/wireguard-tools.git",
+      "commit": "49ce333da02056ae7b22ee2aeb6afe8aaed79b19",
+      "license": "GPL-2.0-only"
+    },
+    "wireguard_go": {
+      "version": "0.0.20250522",
+      "repository": "https://github.com/WireGuard/wireguard-go.git",
+      "commit": "f333402bd9cbe0f3eeb02507bd14e23d7d639280",
+      "license": "MIT",
+      "module_integrity": "go.sum"
+    }
+  }
+}

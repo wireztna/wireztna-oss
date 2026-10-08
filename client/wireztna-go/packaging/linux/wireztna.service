@@ -1,0 +1,21 @@
+[Unit]
+Description=WireZTNA Network Access Service
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/wireztna service
+Restart=on-failure
+RestartSec=5
+
+# Security hardening
+AmbientCapabilities=CAP_NET_ADMIN CAP_NET_RAW
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/var/run/wireztna.sock
+PrivateTmp=yes
+
+[Install]
+WantedBy=multi-user.target

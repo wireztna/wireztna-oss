@@ -1,0 +1,38 @@
+# Environment / secrets
+.env
+*.key
+*.pem
+data/
+*.db
+*.sqlite
+*.sqlite3
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+*.egg-info/
+
+# Node / web-ui
+node_modules/
+web-ui/build/
+.svelte-kit/
+dist/
+
+# Go
+bin/
+*.exe
+*.test
+*.out
+
+# OS / editor
+.DS_Store
+*.swp
+.idea/
+.vscode/
+
+# Build artifacts (bundled only in release tarballs, not committed)
+downloads/
+*.tar.gz

@@ -1,0 +1,12 @@
+# WireZTNA CoreDNS Configuration
+# This is the default/initial Corefile. It will be overwritten by generate-corefile.sh
+# when sites are configured.
+
+# Default: forward all queries to public DNS
+. {
+    forward . 8.8.8.8 1.1.1.1
+    cache 60
+    log
+    errors
+    reload 5s
+}

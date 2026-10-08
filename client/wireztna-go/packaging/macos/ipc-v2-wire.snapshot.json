@@ -1,0 +1,196 @@
+{
+  "schema_format": "wireztna_exact_object_draft_v1",
+  "provenance": "ui_draft_pending_go_exporter",
+  "canonical": false,
+  "protocol_version": 2,
+  "authority": {
+    "controller_commit_read_only": "2015c9ad1ec110167f493f70fab780b3845960c3",
+    "ipc_commit_read_only": "dae1ab53f77e2928435c2e2743e2fa348669b543",
+    "stream_identity": "stream_id_plus_epoch"
+  },
+  "constraints": {
+    "objects": "reject_unknown_and_missing_fields",
+    "ids": "non_empty_when_semantically_required",
+    "integers": "json_safe_integer_only",
+    "timestamps": "rfc3339_with_timezone",
+    "wire_case": "snake_case",
+    "response_correlation": ["protocol_version", "request_id", "idempotency_key"],
+    "event_correlation": ["protocol_version", "request_id", "stream_id", "epoch"],
+    "delivery": "baseline_snapshot_then_replay_push_no_polling"
+  },
+  "enums": {
+    "channel": ["command", "event"],
+    "compatibility": ["current"],
+    "capability": ["strict_framing", "controller_state", "idempotency", "event_replay", "authorization_policy"],
+    "public_command": ["connect", "disconnect", "switch", "get_snapshot", "subscribe"],
+    "controller_command": ["connect", "disconnect", "switch", "renew", "wake", "network_change", "reconcile"],
+    "connection_state": ["disconnected", "connecting", "connected", "reconnecting", "degraded", "auth_required", "update_required"],
+    "health_status": ["unknown", "healthy", "unhealthy"],
+    "progress_stage": ["authenticating", "requesting_access", "configuring_wireguard", "configuring_routes", "configuring_dns", "verifying_connection", "connected"],
+    "event_kind": ["operation_started", "operation_progress", "operation_succeeded", "operation_failed", "snapshot_changed"],
+    "error_code": ["UNAUTHORIZED", "UNSUPPORTED_VERSION", "INVALID_ARGUMENT", "DEADLINE_EXCEEDED", "CANCELED", "CONFLICT", "SERVICE_UNAVAILABLE", "DEGRADED", "REAUTH_REQUIRED", "RESYNC_REQUIRED"]
+  },
+  "records": {
+    "client_hello": {
+      "required": ["kind", "channel", "supported_versions", "capabilities"],
+      "optional": ["required_capabilities"],
+      "fields": {
+        "kind": "literal:hello",
+        "channel": "enum:channel",
+        "supported_versions": "exact_array:[2]",
+        "capabilities": "unique_array:enum:capability",
+        "required_capabilities": "unique_array:enum:capability"
+      }
+    },
+    "server_hello": {
+      "required": ["kind", "negotiated_version", "service_version", "capabilities"],
+      "optional": ["compatibility", "stream_id", "epoch", "error"],
+      "invariants": ["service_version_non_empty", "success_requires_v2_current_stream_id_epoch", "failure_forbids_negotiated_stream_state"],
+      "fields": {
+        "kind": "literal:hello",
+        "negotiated_version": "safe_integer:0_or_2",
+        "service_version": "non_empty_string",
+        "capabilities": "unique_array_or_null_on_failure:enum:capability",
+        "compatibility": "literal:current",
+        "stream_id": "non_empty_id",
+        "epoch": "safe_integer:min:1",
+        "error": "record:wire_error"
+      }
+    },
+    "wire_error": {
+      "required": ["code"],
+      "optional": ["detail"],
+      "fields": { "code": "enum:error_code", "detail": "string" }
+    },
+    "desired_state": {
+      "required": ["configuration_id", "generation", "group_id", "connected"],
+      "optional": ["exit_node_id"],
+      "invariants": ["all_identity_fields_zero_when_unconfigured_or_configuration_generation_group_required"],
+      "fields": {
+        "configuration_id": "string",
+        "generation": "safe_integer:min:0",
+        "group_id": "string",
+        "exit_node_id": "non_empty_id",
+        "connected": "boolean"
+      }
+    },
+    "desired_payload": {
+      "required": ["configuration_id", "generation", "group_id"],
+      "optional": ["exit_node_id"],
+      "fields": {
+        "configuration_id": "non_empty_id",
+        "generation": "safe_integer:min:1",
+        "group_id": "non_empty_id",
+        "exit_node_id": "non_empty_id"
+      }
+    },
+    "health": {
+      "required": ["healthy", "wireguard", "routes", "dns", "end_to_end"],
+      "optional": [],
+      "invariants": ["healthy_equals_all_dimensions_healthy"],
+      "fields": {
+        "healthy": "boolean",
+        "wireguard": "enum:health_status",
+        "routes": "enum:health_status",
+        "dns": "enum:health_status",
+        "end_to_end": "enum:health_status"
+      }
+    },
+    "controller_command": {
+      "required": ["kind", "desired"],
+      "optional": [],
+      "fields": { "kind": "enum:controller_command", "desired": "record:desired_state" }
+    },
+    "active_operation": {
+      "required": ["id", "command", "started_at"],
+      "optional": [],
+      "fields": { "id": "non_empty_id", "command": "record:controller_command", "started_at": "rfc3339_timestamp" }
+    },
+    "snapshot": {
+      "required": ["state", "desired", "applied", "health", "stream_id", "epoch", "sequence"],
+      "optional": ["active_operation"],
+      "invariants": ["stream_identity_required", "connected_requires_applied_connected_and_healthy", "disconnected_forbids_applied_connected_and_healthy", "transitional_or_degraded_forbids_healthy"],
+      "fields": {
+        "state": "enum:connection_state",
+        "desired": "record:desired_state_allow_zero_unconfigured",
+        "applied": "record:desired_state_allow_zero_unconfigured",
+        "health": "record:health",
+        "active_operation": "record:active_operation",
+        "stream_id": "non_empty_id",
+        "epoch": "safe_integer:min:1",
+        "sequence": "safe_integer:min:0"
+      }
+    },
+    "request": {
+      "required": ["protocol_version", "request_id", "idempotency_key", "deadline", "command", "payload"],
+      "optional": [],
+      "invariants": ["mutations_require_idempotency_key", "reads_require_empty_idempotency_key", "payload_matches_command"],
+      "fields": {
+        "protocol_version": "protocol_version",
+        "request_id": "non_empty_id",
+        "idempotency_key": "string",
+        "deadline": "rfc3339_timestamp",
+        "command": "enum:public_command",
+        "payload": "command_discriminated_exact_object"
+      }
+    },
+    "response": {
+      "required": ["protocol_version", "request_id", "idempotency_key", "operation_id", "success"],
+      "optional": ["snapshot", "error"],
+      "invariants": ["exactly_one_success_or_error", "correlates_request", "mutation_success_requires_only_operation_id", "get_snapshot_success_requires_only_snapshot", "subscribe_success_has_no_result_fields"],
+      "fields": {
+        "protocol_version": "literal:2",
+        "request_id": "non_empty_id",
+        "idempotency_key": "string",
+        "operation_id": "string",
+        "success": "boolean",
+        "snapshot": "record:snapshot",
+        "error": "record:wire_error"
+      }
+    },
+    "progress": {
+      "required": ["stage"],
+      "optional": [],
+      "fields": { "stage": "enum:progress_stage" }
+    },
+    "event": {
+      "required": ["sequence", "kind", "operation_id", "occurred_at"],
+      "optional": ["state", "progress", "error"],
+      "invariants": ["operation_lifecycle_requires_non_empty_operation_id", "progress_only_on_operation_progress", "error_only_on_operation_failed", "terminal_exactly_once_per_operation"],
+      "fields": {
+        "sequence": "safe_integer:min:1",
+        "kind": "enum:event_kind",
+        "operation_id": "string",
+        "state": "enum:connection_state",
+        "occurred_at": "rfc3339_timestamp",
+        "progress": "record:progress",
+        "error": "record:wire_error"
+      }
+    },
+    "event_envelope": {
+      "required": ["protocol_version", "request_id", "stream_id", "epoch"],
+      "optional": ["event", "error"],
+      "invariants": ["correlates_subscription", "exactly_one_event_or_terminal_error"],
+      "fields": {
+        "protocol_version": "literal:2",
+        "request_id": "non_empty_id",
+        "stream_id": "non_empty_id",
+        "epoch": "safe_integer:min:1",
+        "event": "record:event",
+        "error": "record:wire_error"
+      }
+    }
+  },
+  "command_payloads": {
+    "connect": "record:desired_payload",
+    "disconnect": "empty_exact_object",
+    "switch": "record:desired_payload",
+    "get_snapshot": "empty_exact_object",
+    "subscribe": {
+      "required": ["stream_id", "epoch", "after_sequence"],
+      "optional": [],
+      "fields": { "stream_id": "non_empty_id", "epoch": "safe_integer:min:1", "after_sequence": "safe_integer:min:0" }
+    }
+  },
+  "excluded_from_canonical_wire": ["enroll", "authenticate", "select_project", "set_mode", "retry_service", "run_diagnostics"]
+}

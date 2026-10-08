@@ -1,0 +1,47 @@
+{
+  "identity": {
+    "contract": "wireztna-platform-evidence",
+    "schema_version": 1,
+    "evidence_id": "fixture.platform-qualified",
+    "generated_at": "2026-01-02T03:04:05Z"
+  },
+  "source": {
+    "producer": "contract-test",
+    "producer_git_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "test_fixture": true
+  },
+  "tuple": {
+    "version": "1.2.3",
+    "git_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "os": "linux",
+    "arch": "amd64",
+    "type": "deb",
+    "artifact": {
+      "filename": "wireztna_contract_fixture_1.2.3_amd64.deb",
+      "size": 1024,
+      "sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+    }
+  },
+  "claim": {
+    "level": "platform-qualified",
+    "artifact": true,
+    "runtime": true,
+    "public_eligibility": true
+  },
+  "gates": [
+    {"id": "contract.e0", "status": "passed"},
+    {"id": "contract.e1", "status": "passed"}
+  ],
+  "signature": {
+    "status": "required-and-verified",
+    "artifact_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "signer_identity": "contract-test-signer"
+  },
+  "provenance": {
+    "status": "verified",
+    "artifact_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "source_git_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "builder_id": "contract-test-builder"
+  },
+  "limitations": ["contract fixture only; this does not declare real platform support"]
+}

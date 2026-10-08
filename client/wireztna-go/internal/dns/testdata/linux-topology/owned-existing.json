@@ -1,0 +1,16 @@
+{
+  "links": [
+    {
+      "identity": {"interface_name": "zt-corp0", "backend": "systemd-resolved", "ifindex": 42},
+      "state": {
+        "servers": ["10.200.0.1"],
+        "domains": [
+          {"name": "apps.corp.example", "route_only": true},
+          {"name": "corp.example", "route_only": false}
+        ],
+        "default_route": false
+      },
+      "owner": "session-7"
+    }
+  ]
+}

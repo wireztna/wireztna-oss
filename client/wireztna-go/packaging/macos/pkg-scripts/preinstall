@@ -1,0 +1,158 @@
+#!/bin/bash -p
+# Runs only under macOS Installer, before payload replacement.
+
+set -euo pipefail
+LC_ALL=C
+PATH=/usr/bin:/bin:/usr/sbin:/sbin
+export LC_ALL PATH
+
+LABEL=com.wireztna.desktop-service
+PLIST=/Library/LaunchDaemons/com.wireztna.desktop-service.plist
+APP=/Applications/WireZTNA.app
+SUPPORT='/Library/Application Support/WireZTNA'
+HELPER_DIR="$SUPPORT/bin"
+HELPER="$HELPER_DIR/wireztna"
+RUNTIME_DIR="$SUPPORT/runtime"
+TXN_DIR=/private/var/db/wireztna-desktop-installer-rollback
+PREVIOUS_APP="$TXN_DIR/WireZTNA.previous.app"
+PREVIOUS_HELPER="$TXN_DIR/wireztna.previous"
+PREVIOUS_RUNTIME="$TXN_DIR/runtime.previous"
+PREVIOUS_PLIST="$TXN_DIR/com.wireztna.desktop-service.previous.plist"
+WAS_ACTIVE="$TXN_DIR/was-active"
+RESTORE_ON_FAILURE=false
+DAEMON_WAS_ACTIVE=false
+TXN_CREATED=false
+
+fail() { printf 'WireZTNA preinstall: %s\n' "$*" >&2; exit 1; }
+
+root_owned_tree_safe() {
+    local path=$1 unsafe
+    [ -d "$path" ] && [ ! -L "$path" ] || return 1
+    unsafe=$(/usr/bin/find "$path" \( -type l -o ! -user root -o ! -group wheel -o -perm -020 -o -perm -002 \) -print -quit) || return 1
+    [ -z "$unsafe" ]
+}
+
+# launchctl_print_state returns 0 only when present, 1 only for the exact
+# macOS service-not-found contract, and 2 for every ambiguous observation.
+launchctl_print_state() {
+    local launchctl_bin=$1 label=$2 stderr rc expected
+    if stderr=$("$launchctl_bin" print "system/$label" 2>&1 >/dev/null); then return 0; else rc=$?; fi
+    expected=$(printf 'Bad request.\nCould not find service "%s" in domain for system' "$label")
+    if [ "$rc" -eq 113 ] && [ "$stderr" = "$expected" ]; then return 1; fi
+    printf 'WireZTNA preinstall: ambiguous launchctl print result: status=%s stderr=%q\n' "$rc" "$stderr" >&2
+    return 2
+}
+# End launchctl_print_state.
+
+remove_upgrade_transaction() {
+    [ "$TXN_CREATED" = true ] || return 0
+    /bin/rm -rf "$TXN_DIR" || return 1
+    TXN_CREATED=false
+}
+
+restore_previous_daemon() {
+    local status=$1 restored=true rc remaining
+    trap - EXIT HUP INT TERM
+    if [ "$status" -ne 0 ] && [ "$RESTORE_ON_FAILURE" = true ]; then
+        if [ "$DAEMON_WAS_ACTIVE" = true ]; then
+            if launchctl_print_state /bin/launchctl "$LABEL"; then :; else
+                rc=$?
+                if [ "$rc" -eq 1 ]; then
+                    /bin/launchctl bootstrap system "$PLIST" || { printf '%s\n' 'WireZTNA preinstall: failed to restore the previous daemon bootstrap; recovery evidence was preserved' >&2; restored=false; }
+                else
+                    printf '%s\n' 'WireZTNA preinstall: could not classify daemon state during restoration; recovery evidence was preserved' >&2
+                    restored=false
+                fi
+            fi
+            if [ "$restored" = true ]; then
+                /bin/launchctl kickstart "system/$LABEL" || { printf '%s\n' 'WireZTNA preinstall: failed to restart the previous daemon; recovery evidence was preserved' >&2; restored=false; }
+            fi
+            remaining=30
+            while [ "$restored" = true ]; do
+                if launchctl_print_state /bin/launchctl "$LABEL"; then break; else rc=$?; fi
+                if [ "$rc" -ne 1 ] || [ "$remaining" -le 0 ]; then
+                    printf '%s\n' 'WireZTNA preinstall: could not prove the previous daemon was restored; recovery evidence was preserved' >&2
+                    restored=false
+                    break
+                fi
+                /bin/sleep 1 || { restored=false; break; }
+                remaining=$((remaining - 1))
+            done
+        fi
+        if [ "$restored" = true ]; then
+            remove_upgrade_transaction || printf '%s\n' 'WireZTNA preinstall: previous installation restored but rollback evidence could not be removed' >&2
+        fi
+    elif [ "$status" -ne 0 ] && [ "$TXN_CREATED" = true ]; then
+        remove_upgrade_transaction || printf '%s\n' 'WireZTNA preinstall: incomplete rollback staging could not be removed' >&2
+    fi
+    exit "$status"
+}
+handle_exit() { local status=$?; restore_previous_daemon "$status"; }
+handle_signal() { restore_previous_daemon "$1"; }
+trap handle_exit EXIT
+trap 'handle_signal 129' HUP
+trap 'handle_signal 130' INT
+trap 'handle_signal 143' TERM
+
+[ "$#" -ge 3 ] || fail 'installer script arguments are required'
+[ "$(/usr/bin/id -u)" -eq 0 ] || fail 'must run in the root Installer context'
+[ "$2" = / ] && [ "$3" = / ] || fail 'only the startup volume root is supported'
+case "$1" in *.pkg) ;; *) fail 'package context is invalid' ;; esac
+[ "$(/usr/bin/uname -s)" = Darwin ] && [ "$(/usr/bin/uname -m)" = arm64 ] || fail 'darwin/arm64 is required'
+
+for path in "$APP" "$HELPER_DIR" "$HELPER" "$RUNTIME_DIR" "$PLIST" "$TXN_DIR"; do [ ! -L "$path" ] || fail "refusing symlink at $path"; done
+[ ! -e "$TXN_DIR" ] || fail 'previous installer rollback evidence exists; recover or remove it explicitly before retrying'
+
+if [ -e "$APP" ] || [ -e "$HELPER" ] || [ -e "$RUNTIME_DIR" ] || [ -e "$PLIST" ]; then
+    [ -d "$APP" ] && [ -d "$HELPER_DIR" ] && [ -f "$HELPER" ] && [ -d "$RUNTIME_DIR" ] && [ -f "$PLIST" ] \
+        || fail 'existing app, helper, runtime, and plist must all be present for a safe upgrade'
+    [ "$(/usr/bin/stat -f '%u:%g:%Lp' "$HELPER_DIR")" = 0:0:755 ] || fail 'existing helper parent metadata is unsafe'
+    root_owned_tree_safe "$APP" || fail 'existing app tree has unsafe ownership, permissions, or symlinks'
+    root_owned_tree_safe "$RUNTIME_DIR" || fail 'existing runtime tree has unsafe ownership, permissions, or symlinks'
+    [ "$(/usr/bin/stat -f '%u:%g:%Lp' "$HELPER")" = 0:0:755 ] || fail 'existing helper metadata is unsafe'
+    [ "$(/usr/bin/stat -f '%u:%g:%Lp' "$PLIST")" = 0:0:644 ] || fail 'existing plist metadata is unsafe'
+    /usr/bin/plutil -lint "$PLIST" >/dev/null || fail 'existing plist is invalid'
+    [ "$(/usr/bin/plutil -extract Label raw -o - "$PLIST")" = "$LABEL" ] || fail 'existing plist label mismatch'
+    [ "$(/usr/bin/plutil -extract ProgramArguments.0 raw -o - "$PLIST")" = "$HELPER" ] || fail 'existing plist helper mismatch'
+    [ "$(/usr/bin/plutil -extract ProgramArguments.2 raw -o - "$PLIST")" = --owner-uid ] || fail 'existing owner argument mismatch'
+    [ "$(/usr/bin/plutil -extract ProgramArguments.4 raw -o - "$PLIST")" = --config-dir ] || fail 'existing config argument mismatch'
+    OWNER_UID=$(/usr/bin/plutil -extract ProgramArguments.3 raw -o - "$PLIST")
+    CONFIG_DIR=$(/usr/bin/plutil -extract ProgramArguments.5 raw -o - "$PLIST")
+    case "$OWNER_UID" in ''|0|*[!0-9]*) fail 'existing owner UID is invalid' ;; esac
+    [ -n "$CONFIG_DIR" ] && [ "${CONFIG_DIR#/}" != "$CONFIG_DIR" ] || fail 'existing config directory is invalid'
+
+    if launchctl_print_state /bin/launchctl "$LABEL"; then DAEMON_WAS_ACTIVE=true; else rc=$?; [ "$rc" -eq 1 ] || fail 'could not classify the existing daemon state'; fi
+
+    /bin/mkdir -m 0700 "$TXN_DIR" || fail 'could not create durable installer rollback directory'
+    TXN_CREATED=true
+    /usr/bin/ditto --norsrc --noextattr --noqtn "$APP" "$PREVIOUS_APP" || fail 'could not preserve previous app for postinstall rollback'
+    /bin/cp -p "$HELPER" "$PREVIOUS_HELPER" || fail 'could not preserve previous helper for postinstall rollback'
+    /usr/bin/ditto --norsrc --noextattr --noqtn "$RUNTIME_DIR" "$PREVIOUS_RUNTIME" || fail 'could not preserve previous runtime for postinstall rollback'
+    /bin/cp -p "$PLIST" "$PREVIOUS_PLIST" || fail 'could not preserve previous plist for postinstall rollback'
+    if [ "$DAEMON_WAS_ACTIVE" = true ]; then printf '1\n' > "$WAS_ACTIVE"; else printf '0\n' > "$WAS_ACTIVE"; fi
+    /usr/sbin/chown -R 0:0 "$PREVIOUS_APP" "$PREVIOUS_RUNTIME"
+    /usr/sbin/chown 0:0 "$PREVIOUS_HELPER" "$PREVIOUS_PLIST" "$WAS_ACTIVE"
+    /bin/chmod 0755 "$PREVIOUS_HELPER"
+    /bin/chmod 0644 "$PREVIOUS_PLIST"
+    /bin/chmod 0600 "$WAS_ACTIVE"
+    root_owned_tree_safe "$PREVIOUS_APP" || fail 'staged previous app failed recursive safety validation'
+    root_owned_tree_safe "$PREVIOUS_RUNTIME" || fail 'staged previous runtime failed recursive safety validation'
+    /bin/sync
+    RESTORE_ON_FAILURE=true
+
+    if [ "$DAEMON_WAS_ACTIVE" = true ]; then /bin/launchctl bootout "system/$LABEL" || fail 'could not stop the exact existing daemon'; fi
+    remaining=30
+    while :; do
+        if launchctl_print_state /bin/launchctl "$LABEL"; then
+            [ "$remaining" -gt 0 ] || fail 'existing daemon remained loaded after 30s'
+            /bin/sleep 1 || fail 'sleep failed while waiting for daemon removal'
+            remaining=$((remaining - 1))
+        else
+            rc=$?; [ "$rc" -eq 1 ] || fail 'could not prove the existing daemon is absent'; break
+        fi
+    done
+    "$HELPER" desktop-verify-disconnected --owner-uid "$OWNER_UID" --config-dir "$CONFIG_DIR" \
+        || fail 'owned network state remains; preserving the old payload and recovery evidence'
+fi
+[ ! -e /var/run/wireztna.sock ] && [ ! -L /var/run/wireztna.sock ] || fail 'legacy IPC socket is present and must be removed by an explicit legacy cleanup'
+exit 0

@@ -1,0 +1,10 @@
+{
+  "identity": {"contract": "wireztna-platform-evidence", "schema_version": 1, "evidence_id": "fixture.short-sha", "generated_at": "2026-01-02T03:04:05Z"},
+  "source": {"producer": "contract-test", "producer_git_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "test_fixture": true},
+  "tuple": {"version": "1.2.3", "git_sha": "aaaaaaa", "os": "linux", "arch": "amd64", "type": "deb"},
+  "claim": {"level": "host-readiness", "artifact": false, "runtime": false, "public_eligibility": false},
+  "gates": [],
+  "signature": {"status": "not-asserted"},
+  "provenance": {"status": "not-asserted"},
+  "limitations": ["negative contract fixture"]
+}

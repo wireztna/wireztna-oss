@@ -1,0 +1,10 @@
+{
+  "identity": {"contract": "wireztna-platform-evidence", "schema_version": 1, "evidence_id": "fixture.signature-drift", "generated_at": "2026-01-02T03:04:05Z"},
+  "source": {"producer": "contract-test", "producer_git_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "test_fixture": true},
+  "tuple": {"version": "1.2.3", "git_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "os": "linux", "arch": "amd64", "type": "deb", "artifact": {"filename": "fixture.deb", "size": 1, "sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"}},
+  "claim": {"level": "platform-qualified", "artifact": true, "runtime": true, "public_eligibility": true},
+  "gates": [{"id": "contract.e0", "status": "passed"}],
+  "signature": {"status": "required-and-verified", "artifact_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd", "signer_identity": "contract-test-signer"},
+  "provenance": {"status": "verified", "artifact_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc", "source_git_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "builder_id": "contract-test-builder"},
+  "limitations": ["negative contract fixture"]
+}

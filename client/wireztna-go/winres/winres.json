@@ -1,0 +1,41 @@
+{
+  "RT_GROUP_ICON": {
+    "APP": {
+      "0000": [
+        "../packaging/windows/wireztna.png"
+      ]
+    }
+  },
+  "RT_MANIFEST": {
+    "#1": {
+      "0409": {
+        "identity": { "name": "WireZTNA", "version": "0.9.30.0" },
+        "description": "WireZTNA — Zero Trust Network Access",
+        "minimum-os": "win10",
+        "execution-level": "as invoker",
+        "dpi-awareness": "per monitor v2",
+        "long-path-aware": true,
+        "use-common-controls-v6": true
+      }
+    }
+  },
+  "RT_VERSION": {
+    "#1": {
+      "0000": {
+        "fixed": { "file_version": "0.9.30.0", "product_version": "0.9.30.0" },
+        "info": {
+          "0409": {
+            "CompanyName": "WireZTNA",
+            "FileDescription": "WireZTNA Client",
+            "FileVersion": "0.9.30",
+            "InternalName": "wireztna",
+            "LegalCopyright": "Copyright 2024-2026 WireZTNA",
+            "OriginalFilename": "wireztna.exe",
+            "ProductName": "WireZTNA",
+            "ProductVersion": "0.9.30"
+          }
+        }
+      }
+    }
+  }
+}

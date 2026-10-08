@@ -1,0 +1,6 @@
+{
+  "identifier": "main-window",
+  "description": "Minimal core permissions for the non-privileged desktop shell.",
+  "windows": ["main"],
+  "permissions": ["core:default"]
+}

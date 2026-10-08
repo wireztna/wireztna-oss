@@ -1,0 +1,375 @@
+{
+  "schemaVersion": 1,
+  "gateId": "Toolkit_Gate",
+  "statusValues": [
+    "not_run",
+    "pass",
+    "fail",
+    "blocked"
+  ],
+  "candidates": [
+    {
+      "id": "tauri-svelte",
+      "label": "Tauri + Svelte"
+    },
+    {
+      "id": "wails-svelte",
+      "label": "Wails + Svelte"
+    }
+  ],
+  "targets": [
+    {
+      "id": "macos-arm64",
+      "platform": "macos",
+      "osRelease": "exact-version-required-at-measurement",
+      "architecture": "arm64",
+      "desktopEnvironment": "Aqua",
+      "displayProtocol": "Quartz",
+      "required": true,
+      "signing": {
+        "allowed": "ad-hoc-local-only",
+        "claimsExcluded": [
+          "developer-id",
+          "notarized",
+          "gatekeeper-clean-distribution",
+          "ga-ready"
+        ]
+      }
+    },
+    {
+      "id": "ubuntu-24.04-amd64-gnome-wayland",
+      "platform": "ubuntu",
+      "osRelease": "24.04 LTS",
+      "architecture": "amd64",
+      "desktopEnvironment": "GNOME 46",
+      "displayProtocol": "Wayland",
+      "required": true
+    },
+    {
+      "id": "ubuntu-24.04-amd64-gnome-x11",
+      "platform": "ubuntu",
+      "osRelease": "24.04 LTS",
+      "architecture": "amd64",
+      "desktopEnvironment": "GNOME 46",
+      "displayProtocol": "X11",
+      "required": true
+    },
+    {
+      "id": "ubuntu-24.04-amd64-kde-wayland",
+      "platform": "ubuntu",
+      "osRelease": "24.04 LTS",
+      "architecture": "amd64",
+      "desktopEnvironment": "KDE Plasma 5.27",
+      "displayProtocol": "Wayland",
+      "required": true
+    },
+    {
+      "id": "ubuntu-24.04-amd64-kde-x11",
+      "platform": "ubuntu",
+      "osRelease": "24.04 LTS",
+      "architecture": "amd64",
+      "desktopEnvironment": "KDE Plasma 5.27",
+      "displayProtocol": "X11",
+      "required": true
+    },
+    {
+      "id": "ubuntu-24.04-arm64-gnome-wayland",
+      "platform": "ubuntu",
+      "osRelease": "24.04 LTS",
+      "architecture": "arm64",
+      "desktopEnvironment": "GNOME 46",
+      "displayProtocol": "Wayland",
+      "required": true
+    },
+    {
+      "id": "ubuntu-24.04-arm64-gnome-x11",
+      "platform": "ubuntu",
+      "osRelease": "24.04 LTS",
+      "architecture": "arm64",
+      "desktopEnvironment": "GNOME 46",
+      "displayProtocol": "X11",
+      "required": true
+    },
+    {
+      "id": "ubuntu-24.04-arm64-kde-wayland",
+      "platform": "ubuntu",
+      "osRelease": "24.04 LTS",
+      "architecture": "arm64",
+      "desktopEnvironment": "KDE Plasma 5.27",
+      "displayProtocol": "Wayland",
+      "required": true
+    },
+    {
+      "id": "ubuntu-24.04-arm64-kde-x11",
+      "platform": "ubuntu",
+      "osRelease": "24.04 LTS",
+      "architecture": "arm64",
+      "desktopEnvironment": "KDE Plasma 5.27",
+      "displayProtocol": "X11",
+      "required": true
+    }
+  ],
+  "exclusions": [
+    {
+      "id": "macos-intel",
+      "platform": "macos",
+      "architecture": "x86_64",
+      "reason": "macOS Intel is outside the initial Toolkit_Gate and must not inherit arm64 evidence."
+    }
+  ],
+  "criteria": [
+    {
+      "id": "tray-menu",
+      "kind": "behavior",
+      "mandatory": true,
+      "requiredScenarios": [
+        "tray-present"
+      ],
+      "capabilityAbsentOutcome": "fail",
+      "passRule": "Explicit evidence shows supported tray/menu actions work with tray capability present. Missing or unsupported tray capability fails this criterion and normal-window fallback evidence cannot substitute for it."
+    },
+    {
+      "id": "normal-window",
+      "kind": "behavior",
+      "mandatory": true,
+      "requiredScenarios": [
+        "tray-present",
+        "tray-absent"
+      ],
+      "passRule": "Separate evidence for each required scenario shows the standard Journey remains usable in a normal window; the tray-absent scenario measures the complete window-and-notification fallback independently from tray-menu."
+    },
+    {
+      "id": "quit-ui-semantics",
+      "kind": "behavior",
+      "mandatory": true,
+      "passRule": "Explicit evidence shows quitting the UI leaves the service and tunnel running."
+    },
+    {
+      "id": "single-instance",
+      "kind": "behavior",
+      "mandatory": true,
+      "passRule": "Explicit evidence shows a second launch is handled by the existing instance without duplicate shell ownership."
+    },
+    {
+      "id": "enrollment-deep-link",
+      "kind": "behavior",
+      "mandatory": true,
+      "passRule": "Explicit evidence shows a valid enrollment deep link reaches the existing instance and malformed links are rejected."
+    },
+    {
+      "id": "notifications",
+      "kind": "behavior",
+      "mandatory": true,
+      "passRule": "Explicit evidence shows notifications are accessible and preserve truthful connection state."
+    },
+    {
+      "id": "ipc-event-stream",
+      "kind": "behavior",
+      "mandatory": true,
+      "passRule": "Explicit evidence shows ordered mock IPC events drive the UI without periodic state polling."
+    },
+    {
+      "id": "ipc-coexistence",
+      "kind": "behavior",
+      "mandatory": true,
+      "passRule": "Explicit evidence shows shell IPC coexists with window, tray, deep-link, notification, and single-instance handling."
+    },
+    {
+      "id": "connection-screen",
+      "kind": "behavior",
+      "mandatory": true,
+      "passRule": "Explicit evidence shows representative connection states and progress render from the shared mock contract."
+    },
+    {
+      "id": "keyboard-accessibility",
+      "kind": "accessibility",
+      "mandatory": true,
+      "passRule": "Recorded keyboard-only Journey completes without a critical blocker and with visible, restored focus."
+    },
+    {
+      "id": "screen-reader-accessibility",
+      "kind": "accessibility",
+      "mandatory": true,
+      "passRule": "Recorded VoiceOver on macOS or Orca on Ubuntu completes the standard Journey without a critical blocker."
+    },
+    {
+      "id": "scaling",
+      "kind": "accessibility",
+      "mandatory": true,
+      "passRule": "Recorded validation at 100%, 150%, and 200% scaling has no clipped required action or critical loss of content."
+    },
+    {
+      "id": "startup-p95",
+      "kind": "performance",
+      "mandatory": true,
+      "measurement": "cold-start-to-interactive",
+      "thresholds": [
+        {
+          "statistic": "p95",
+          "operator": "lte",
+          "value": 2,
+          "unit": "seconds"
+        }
+      ],
+      "minimumSamples": 10
+    },
+    {
+      "id": "idle-rss",
+      "kind": "performance",
+      "mandatory": true,
+      "measurement": "candidate-process-tree-resident-set-size-after-idle-stabilization",
+      "thresholds": [
+        {
+          "statistic": "maximum",
+          "operator": "lte",
+          "value": 150,
+          "unit": "MiB"
+        }
+      ]
+    },
+    {
+      "id": "idle-cpu",
+      "kind": "performance",
+      "mandatory": true,
+      "measurement": "candidate-process-tree-cpu-after-idle-stabilization",
+      "thresholds": [
+        {
+          "statistic": "median",
+          "operator": "lte",
+          "value": 1,
+          "unit": "percent"
+        },
+        {
+          "statistic": "p95",
+          "operator": "lte",
+          "value": 3,
+          "unit": "percent"
+        }
+      ]
+    },
+    {
+      "id": "reproducible-build",
+      "kind": "build",
+      "mandatory": true,
+      "passRule": "At least two clean locked builds succeed and produce matching normalized artifact SHA-256 digests with the normalization recorded."
+    }
+  ],
+  "measurementProtocol": {
+    "percentiles": {
+      "method": "nearest-rank",
+      "ordering": "ascending",
+      "pRepresentation": "fraction-between-zero-and-one",
+      "rankFormula": "ceil(p * n)",
+      "rankIndexBase": 1
+    },
+    "startup": {
+      "minimumColdStarts": 10,
+      "startEvent": "candidate-root-process-launch-request",
+      "interactiveDefinition": "The normal window has rendered and accepts the first user action.",
+      "coldStartDefinition": {
+        "candidateProcessState": "no-candidate-process-tree-running",
+        "launchProcessState": "new-root-process",
+        "applicationProfileState": "restore-recorded-baseline",
+        "mockTransportState": "restore-recorded-baseline",
+        "osPageCacheState": "record-preparation-and-observed-state-no-universal-reset-assumed"
+      },
+      "beforeEachAttempt": [
+        "terminate-previous-candidate-process-tree",
+        "confirm-candidate-process-tree-absent",
+        "restore-recorded-application-profile-baseline",
+        "restore-recorded-mock-transport-baseline",
+        "wait-for-recorded-idle-baseline"
+      ],
+      "samplePolicy": {
+        "failedLaunch": "invalidate-run-no-pass",
+        "timeout": "invalidate-run-no-pass",
+        "missingSample": "invalidate-run-no-pass",
+        "outlierRemoval": "forbidden"
+      }
+    },
+    "idleResources": {
+      "stabilizationSeconds": 60,
+      "measurementSeconds": 300,
+      "sampleIntervalSeconds": 1,
+      "expectedSamples": 300,
+      "sampleCountRule": "exactly",
+      "networkCondition": "Mock transport steady state with no scripted events.",
+      "processScope": {
+        "root": "candidate-root-process",
+        "include": "complete-recursive-process-tree",
+        "requiredDescendants": [
+          "webview-processes",
+          "child-processes",
+          "all-other-descendants"
+        ],
+        "membershipDiscovery": "refresh-each-sample"
+      },
+      "perTimestampAggregation": {
+        "rssMiB": "sum-rss-across-complete-process-tree",
+        "cpuPercent": "sum-cpu-percent-across-complete-process-tree"
+      },
+      "seriesAggregation": {
+        "rssMiB": "maximum",
+        "cpuPercent": [
+          "median",
+          "p95-nearest-rank"
+        ]
+      },
+      "samplePolicy": {
+        "missingSample": "invalidate-run-no-pass",
+        "collectorError": "invalidate-run-no-pass",
+        "inaccessibleProcess": "invalidate-run-no-pass",
+        "incompleteProcessTree": "invalidate-run-no-pass"
+      }
+    },
+    "measurementTool": {
+      "selection": "platform-specific-not-prescribed",
+      "evidenceRequires": [
+        "tool-name",
+        "tool-version",
+        "collection-method-or-command"
+      ]
+    },
+    "build": {
+      "minimumCleanBuilds": 2,
+      "dependencyMode": "locked",
+      "digest": "sha256"
+    }
+  },
+  "evidencePolicy": {
+    "directory": "toolkit-gate/evidence/",
+    "pathRequirement": "relative-file-descendant-of-directory",
+    "missingResultStatus": "not_run",
+    "passRequiresEvidence": true,
+    "blockedCountsAsPass": false,
+    "absenceCountsAsPass": false,
+    "partialCollectionCountsAsPass": false,
+    "exactEnvironmentMetadataRequired": true,
+    "requiredMetadata": [
+      "candidate-id",
+      "target-id",
+      "criterion-id",
+      "exact-environment",
+      "toolkit-and-toolchain-versions",
+      "measurement-tool-name",
+      "measurement-tool-version",
+      "measurement-method-or-command",
+      "protocol-applied",
+      "raw-samples-or-observations",
+      "operator",
+      "timestamp"
+    ],
+    "mitigationPassRequires": [
+      "bounded mitigation description",
+      "automated or recorded regression check",
+      "fresh passing evidence after mitigation"
+    ]
+  },
+  "results": [],
+  "decision": {
+    "status": "not_run",
+    "selectedCandidate": null,
+    "adrPath": null,
+    "reason": "No measurements have been recorded. Toolkit execution and selection remain tasks 2.4 and 2.5."
+  }
+}

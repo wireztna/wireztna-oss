@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  NON-CANONICAL, INTENTIONALLY EMPTY WiX 4 STUB.
+
+  This path must not define or build a second WireZTNA product. The sole MSI
+  contract is wireztna-wixl.wxs and the fail-closed entry point is build-msi.ps1.
+  Keeping an empty Wix root makes accidental `wix build wireztna.wxs` fail
+  without emitting an alternate ProductCode/UpgradeCode family.
+-->
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs" />

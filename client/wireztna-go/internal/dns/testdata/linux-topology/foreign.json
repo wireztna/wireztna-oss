@@ -1,0 +1,13 @@
+{
+  "links": [
+    {
+      "identity": {"interface_name": "zt-corp0", "backend": "systemd-resolved", "ifindex": 42},
+      "state": {
+        "servers": ["203.0.113.53"],
+        "domains": [{"name": "foreign.example", "route_only": true}],
+        "default_route": true
+      },
+      "owner": "other-vpn"
+    }
+  ]
+}
