@@ -17,6 +17,7 @@ Replace a flat VPN with fine-grained, per-user access to private resources —
 [![Go](https://img.shields.io/badge/agents-Go-00ADD8.svg?logo=go&logoColor=white)](https://go.dev/)
 [![SvelteKit](https://img.shields.io/badge/web--ui-SvelteKit-FF3E00.svg?logo=svelte&logoColor=white)](https://kit.svelte.dev/)
 [![Self-hosted](https://img.shields.io/badge/self--hosted-yes-success.svg)](docs/install.md)
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/wireztna/wireztna-oss)
 
 <br/>
 
