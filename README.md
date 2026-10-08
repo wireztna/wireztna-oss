@@ -18,6 +18,7 @@ Replace a flat VPN with fine-grained, per-user access to private resources —
 [![SvelteKit](https://img.shields.io/badge/web--ui-SvelteKit-FF3E00.svg?logo=svelte&logoColor=white)](https://kit.svelte.dev/)
 [![Self-hosted](https://img.shields.io/badge/self--hosted-yes-success.svg)](docs/install.md)
 [![Ask DeepWiki](https://img.shields.io/badge/Ask-DeepWiki-20B2AA.svg)](https://deepwiki.com/wireztna/wireztna-oss)
+[![GitHub stars](https://img.shields.io/github/stars/wireztna/wireztna-oss?style=flat&logo=github)](https://github.com/wireztna/wireztna-oss/stargazers)
 
 <br/>
 
@@ -25,7 +26,8 @@ Replace a flat VPN with fine-grained, per-user access to private resources —
 **[💬 Discord](https://discord.gg/vqC82g2G)** ·
 **[📘 Docs](docs/install.md)** ·
 **[🏗️ Architecture](docs/architecture.md)** ·
-**[🤝 Contributing](CONTRIBUTING.md)**
+**[🤝 Contributing](CONTRIBUTING.md)** ·
+**[💼 LinkedIn](https://www.linkedin.com/company/wireztna/)**
 
 <br/>
 
