@@ -154,7 +154,9 @@ wzctl connect  --broker http://<YOUR_PUBLIC_IP> --publisher <id> --target 10.0.0
 ## Contributing
 
 <div align="center">
-<img src=".github/assets/wireztna-mascot.png" alt="WireZTNA mascot — Orca" width="200" />
+<img src=".github/assets/wireztna-mascot.png" alt="Zeta the orca — WireZTNA mascot" width="200" />
+<br/>
+<sub>Meet <strong>Zeta the orca</strong>, the WireZTNA mascot — <a href="docs/mascot.md">learn more</a>.</sub>
 </div>
 
 Contributions are welcome — see [CONTRIBUTING.md](CONTRIBUTING.md). Join the
