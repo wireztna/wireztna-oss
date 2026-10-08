@@ -153,6 +153,10 @@ wzctl connect  --broker http://<YOUR_PUBLIC_IP> --publisher <id> --target 10.0.0
 
 ## Contributing
 
+<div align="center">
+<img src=".github/assets/wireztna-mascot.png" alt="WireZTNA mascot — Orca" width="200" />
+</div>
+
 Contributions are welcome — see [CONTRIBUTING.md](CONTRIBUTING.md). Join the
 [Discord](https://discord.gg/vqC82g2G) to discuss ideas before opening a large PR.
 
