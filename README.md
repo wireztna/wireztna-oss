@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="https://avatars.githubusercontent.com/u/309480116?s=200&v=4" alt="WireZTNA" width="120" height="120" />
+<img src=".github/assets/wireztna-logo.png" alt="WireZTNA" width="120" height="120" />
 
 # WireZTNA — Community Edition
 
