@@ -1,0 +1,11 @@
+# Code owners para WireZTNA — Community Edition
+#
+# Toda PR hacia la rama protegida (main) requiere la aprobacion de al menos
+# uno de los propietarios listados aqui, siempre que el ruleset de la rama
+# tenga activada la opcion "Require review from Code Owners".
+#
+# Formato: <patron>  <propietarios>
+# Docs: https://docs.github.com/articles/about-code-owners
+
+# Propietarios por defecto de todo el repositorio
+*       @irraz @sjimnar
