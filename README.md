@@ -32,6 +32,8 @@ Replace a flat VPN with fine-grained, per-user access to private resources —
 
 <br/>
 
+https://github.com/user-attachments/assets/cc37c6f8-546a-4a97-93e6-14f95a164e50
+
 </div>
 
 ---
