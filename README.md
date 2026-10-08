@@ -153,14 +153,18 @@ wzctl connect  --broker http://<YOUR_PUBLIC_IP> --publisher <id> --target 10.0.0
 
 ## Contributing
 
-<div align="center">
-<img src=".github/assets/wireztna-mascot.png" alt="Zeta the orca — WireZTNA mascot" width="200" />
-<br/>
-<sub>Meet <strong>Zeta the orca</strong>, the WireZTNA mascot — <a href="docs/mascot.md">learn more</a>.</sub>
-</div>
-
 Contributions are welcome — see [CONTRIBUTING.md](CONTRIBUTING.md). Join the
 [Discord](https://discord.gg/vqC82g2G) to discuss ideas before opening a large PR.
+
+## Meet Zeta
+
+<div align="center">
+<img src=".github/assets/wireztna-mascot.png" alt="Zeta the orca — WireZTNA mascot" width="200" />
+</div>
+
+**Zeta the orca** is the WireZTNA mascot — a nod to **ZTNA** and to the orca
+that gives our releases their marine codenames. Read the story in
+[`docs/mascot.md`](docs/mascot.md).
 
 ## License
 
